@@ -1,4 +1,4 @@
-.PHONY: quality style test docs utils
+.PHONY: quality style test test_cpu docs utils
 
 check_dirs := .
 
@@ -15,6 +15,11 @@ style:
 	ruff format $(check_dirs)
 	
 # Run tests for the library
+test_cpu:
+	python -m pytest -v tests/test_cpu.py tests/test_data_loader.py tests/test_hooks.py \
+	tests/test_modeling_utils.py tests/test_launch.py \
+	tests/test_utils.py tests/test_dataclasses.py tests/test_offload.py
+
 test_core:
 	python -m pytest -s -v ./tests/ \
 	--ignore=./tests/test_big_modeling.py \

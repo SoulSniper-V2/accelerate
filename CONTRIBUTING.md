@@ -247,3 +247,21 @@ In fact, that's how `make test` is implemented (sans the `pip install` line)!
 
 You can specify a smaller set of tests in order to test only the feature
 you're working on.
+
+### CPU checks on forks
+
+Fork pull requests run `make test_cpu` on GitHub-hosted runners, using Python 3.10
+with PyTorch 2.5.1 and Python 3.14 with PyTorch 2.14.1. This covers CPU training,
+data loading, checkpoint loading, hooks, and launchers without downloading models.
+GPU and optional integration tests still need their respective hardware and dependencies.
+
+To run the same checks in a fresh virtual environment:
+
+```bash
+python -m pip install torch==2.14.1 --index-url https://download.pytorch.org/whl/cpu
+python -m pip install '.[test_prod]'
+HF_HUB_OFFLINE=1 HF_DATASETS_OFFLINE=1 OMP_NUM_THREADS=2 MKL_NUM_THREADS=2 make test_cpu
+```
+
+The fork workflow also runs `accelerate env`, generates a CPU configuration with
+`accelerate config default`, and verifies it with `accelerate test`.

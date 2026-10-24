@@ -275,3 +275,8 @@ class TestParallelismConfig:
 
     def test_tp_handler(self):
         assert True, "Tensor parallelism handler doesn't hold any logic yet"
+
+    def test_reject_tp_with_unsynchronized_dp_replicas(self):
+        # Supplying the handler isolates configuration validation from optional Transformers dependencies.
+        with pytest.raises(ValueError, match="cannot be used with pure data parallelism"):
+            ParallelismConfig(tp_size=2, dp_replicate_size=2, dp_shard_size=1, tp_handler=Mock())

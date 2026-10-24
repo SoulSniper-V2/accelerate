@@ -806,9 +806,18 @@ def _attach_context_parallel_hooks(
 
     """
 
-    # The hook below drops the attention mask and forces `is_causal=True`; transformers says whether
-    # that substitution is safe. Defaults to allowed, so an older transformers behaves as before.
-    if not getattr(model, "supports_context_parallel", True):
+    # Older Transformers and custom models lack the capability property; preserve their configuration checks.
+    supports_context_parallel = getattr(model, "supports_context_parallel", None)
+    if supports_context_parallel is None:
+        config = getattr(model, "config", None)
+        config = config.get_text_config() if hasattr(config, "get_text_config") else config
+        layer_types = getattr(config, "layer_types", None)
+        supports_context_parallel = (
+            all(layer_type == "full_attention" for layer_type in layer_types)
+            if layer_types is not None
+            else not getattr(config, "sliding_window", None)
+        )
+    if not supports_context_parallel:
         raise ValueError(
             f"{model.__class__.__name__} does not support context parallelism. Context parallelism can "
             "only express full causal attention: the per-layer mask has to be dropped, so a layer using "
