@@ -1,4 +1,4 @@
-.PHONY: quality style test docs utils
+.PHONY: quality style test test_cpu docs utils
 
 check_dirs := .
 
@@ -15,6 +15,11 @@ style:
 	ruff format $(check_dirs)
 	
 # Run tests for the library
+test_cpu:
+	python -m pytest -v tests/test_cpu.py tests/test_data_loader.py tests/test_hooks.py \
+	tests/test_modeling_utils.py tests/test_launch.py \
+	tests/test_utils.py tests/test_dataclasses.py tests/test_offload.py
+
 test_core:
 	python -m pytest -s -v ./tests/ \
 	--ignore=./tests/test_big_modeling.py \
@@ -24,6 +29,7 @@ test_core:
 	--ignore=./tests/deepspeed \
 	--ignore=./tests/fsdp \
 	--ignore=./tests/tp \
+	--ignore=./tests/distributed/test_distributed_deepspeed.py \
 	$(if $(IS_GITHUB_CI),--report-log "$(PYTORCH_VERSION)_core.log",)
 
 test_cli:
@@ -33,7 +39,7 @@ test_big_modeling:
 	python -m pytest -s -v ./tests/test_big_modeling.py ./tests/test_modeling_utils.py $(if $(IS_GITHUB_CI),--report-log "$(PYTORCH_VERSION)_big_modeling.log",)
 
 test_deepspeed:
-	python -m pytest -s -v ./tests/deepspeed $(if $(IS_GITHUB_CI),--report-log "$(PYTORCH_VERSION)_deepspeed.log",)
+	python -m pytest -s -v ./tests/deepspeed ./tests/distributed/test_distributed_deepspeed.py $(if $(IS_GITHUB_CI),--report-log "$(PYTORCH_VERSION)_deepspeed.log",)
 
 test_fsdp:
 	python -m pytest -s -v ./tests/fsdp $(if $(IS_GITHUB_CI),--report-log "$(PYTORCH_VERSION)_fsdp.log",)

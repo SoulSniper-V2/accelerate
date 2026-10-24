@@ -145,7 +145,7 @@ For instance, here is how you would run the GLUE example on the MRPC task (from 
 accelerate launch examples/nlp_example.py
 ```
 
-This CLI tool is **optional**, and you can still use `python my_script.py` or `python -m torchrun my_script.py` at your convenience.
+This CLI tool is **optional**, and you can still use `python my_script.py` or `torchrun my_script.py` at your convenience.
 
 You can also directly pass in the arguments you would to `torchrun` as arguments to `accelerate launch` if you wish to not run` accelerate config`.
 

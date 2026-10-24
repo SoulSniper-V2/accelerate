@@ -15,13 +15,14 @@
 import inspect
 import re
 import unittest
+from types import SimpleNamespace
 
 import torch
 import torch.nn as nn
 from parameterized import parameterized
 from torch.fx import symbolic_trace
 
-from accelerate.big_modeling import attach_layerwise_casting_hooks
+from accelerate.big_modeling import _attach_context_parallel_hooks, attach_layerwise_casting_hooks
 from accelerate.hooks import (
     AlignDevicesHook,
     CpuOffload,
@@ -60,6 +61,57 @@ class PreForwardHook(ModelHook):
 class PostForwardHook(ModelHook):
     def post_forward(self, module, output):
         return output + 1
+
+
+class ContextParallelHooksTester(unittest.TestCase):
+    @staticmethod
+    def _model(config, capability=None):
+        class Attention(nn.Module):
+            def forward(self, hidden_states, attention_mask=None, is_causal=False):
+                return hidden_states, attention_mask, is_causal
+
+        model = nn.Module()
+        model.self_attn = Attention()
+        model.config = SimpleNamespace(get_text_config=lambda: config)
+        if capability is not None:
+            model.supports_context_parallel = capability
+        return model
+
+    @parameterized.expand(
+        [
+            ("sliding_window", SimpleNamespace(sliding_window=64), None),
+            ("sliding_attention", SimpleNamespace(layer_types=["full_attention", "sliding_attention"]), None),
+            ("chunked_attention", SimpleNamespace(layer_types=["chunked_attention"]), None),
+            ("recurrent_attention", SimpleNamespace(layer_types=["linear_attention"]), None),
+            ("unsupported_capability", SimpleNamespace(layer_types=["full_attention"]), False),
+        ]
+    )
+    def test_rejects_unsupported_attention_without_changing_mask(self, name, config, capability):
+        model = self._model(config, capability)
+        with self.assertRaisesRegex(ValueError, "does not support context parallelism"):
+            _attach_context_parallel_hooks(model)
+
+        hidden_states, mask = torch.ones(2, 2), torch.eye(2)
+        _, actual_mask, is_causal = model.self_attn(hidden_states, attention_mask=mask)
+        self.assertIs(actual_mask, mask)
+        self.assertFalse(is_causal)
+
+    @parameterized.expand(
+        [
+            ("legacy_full_attention", SimpleNamespace(layer_types=["full_attention"]), None),
+            ("legacy_no_window", SimpleNamespace(), None),
+            ("supported_capability", SimpleNamespace(sliding_window=64), True),
+        ]
+    )
+    def test_supported_attention_uses_causal_mask(self, name, config, capability):
+        model = self._model(config, capability)
+        _attach_context_parallel_hooks(model)
+
+        hidden_states, mask = torch.ones(2, 2), torch.eye(2)
+        actual_states, actual_mask, is_causal = model.self_attn(hidden_states, attention_mask=mask)
+        self.assertIs(actual_states, hidden_states)
+        self.assertIsNone(actual_mask)
+        self.assertTrue(is_causal)
 
 
 class HooksModelTester(unittest.TestCase):
